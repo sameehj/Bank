@@ -23,9 +23,10 @@ int main(int argc, char** argv) {
 
 	stillATMs = 1;
 	srand(time(NULL));
-	pthread_t taxThread;
 	pthread_t threads[atms];
+	pthread_t taxThread;
 	pthread_t printStatusThread;
+	
 	struct pthread_data thread_data[atms];
 	if (!to) {
 		cerr << "cannot open the log file" << endl;

@@ -11,7 +11,7 @@ extern int stillATMs;
 
 #define MAX_LENGTH 100
 #define ONE_SECONDS 100000
-#define THREE_SECONDS 300000
+#define THREE_SECONDS 3000000
 #define FIVE_SECONDS 500000
 
 
