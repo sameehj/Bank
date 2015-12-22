@@ -2,7 +2,7 @@
 #include "thread.h"
 
 
-list Bank;
+BankAccountsList Bank;
 ofstream to("log.txt");
 int stillATMs;
 
@@ -23,10 +23,10 @@ int main(int argc, char** argv) {
 
 	stillATMs = 1;
 	srand(time(NULL));
-	pthread_t threads[atms];
 	pthread_t taxThread;
+	pthread_t threads[atms];
 	pthread_t printStatusThread;
-	struct pthread_data data[atms];
+	struct pthread_data thread_data[atms];
 	if (!to) {
 		cerr << "cannot open the log file" << endl;
 		exit(0);
@@ -34,15 +34,15 @@ int main(int argc, char** argv) {
 
 
 
-	pthread_create(&taxThread, NULL, taxbank , NULL );
+	pthread_create(&taxThread, NULL, commisionTaxBank , NULL );
 
-	pthread_create(&printStatusThread, NULL, printbank , NULL );
+	pthread_create(&printStatusThread, NULL, printBankAccounts , NULL );
 
 
 	for (int i = 0; i < atms; i++) {
-		data[i].threadID = i+1;
-		data[i].input_file = argv[i + 2];
-		pthread_create(&threads[i], NULL, ATM , &data[i]);
+		thread_data[i].threadId = i+1;
+		thread_data[i].input_file = argv[i + 2];
+		pthread_create(&threads[i], NULL, ATM , &thread_data[i]);
 	}
 
 	for (int i = 0; i < atms; i++) {

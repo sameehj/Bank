@@ -1,385 +1,367 @@
 #include "list.h"
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
 
+//READERS WRITERS 2015S
+int BankAccountsList::open_account(int id, int password, int amount, int atmID){
 
-int list::open_account(int ID,int Pass,int amount,int atmID){
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt++;
-	if(all_rd_cnt==1){
-		pthread_mutex_lock(&lock_all_wrt);
+	pthread_mutex_lock(&all_readers);
+	readers_count++;
+	
+	if(readers_count==1){
+		pthread_mutex_lock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
-	pthread_mutex_lock(&lock_add_wrt);
-	if(getAccount(ID)){
-		pthread_mutex_lock(&lock_print);
+	pthread_mutex_unlock(&all_readers);
+	pthread_mutex_lock(&add_writer);
+	if(getAccount(id)){
+		pthread_mutex_lock(&print_mutex);
 		to << "Error " << atmID <<": Your transaction failed - account with the same id exists" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	} else{
-		node* temp = new node(ID,amount,Pass);
+		BankAccount* temp = new BankAccount(id,amount,password);
 		if(!numaccount){
 			head=temp;
 			tail=temp;
 			numaccount++;
 		}else{
-			tail->next=temp;
+			tail->Next=temp;
 			tail=temp;
 			numaccount++;
 		}
-		pthread_mutex_lock(&lock_print);
-		to <<  atmID << ": New account id is " << ID << " with password " << Pass << " and initial balance " << amount << endl; 
+		pthread_mutex_lock(&print_mutex);
+		to <<  atmID << ": New account id is " << id << " with password " << password << " and initial balance " << amount << endl; 
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-
-
+		pthread_mutex_unlock(&print_mutex);
 	}
 
 
-	pthread_mutex_unlock(&lock_add_wrt);
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt--;
-	if(all_rd_cnt==0){
-		pthread_mutex_unlock(&lock_all_wrt);
+	pthread_mutex_unlock(&add_writer);
+	pthread_mutex_lock(&all_readers);
+	readers_count--;
+	if(readers_count==0){
+		pthread_mutex_unlock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
-	//printf("***open**\n");
+	pthread_mutex_unlock(&all_readers);
 }
 
-
-int list::deposit(int ID,int Pass,int amount,int atmID){
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt++;
-	if(all_rd_cnt==1){
-		pthread_mutex_lock(&lock_all_wrt);
+//READERS WRITERS 2015S
+int BankAccountsList::deposit(int id,int password,int amount,int atmID){
+	pthread_mutex_lock(&all_readers);
+	readers_count++;
+	if(readers_count==1){
+		pthread_mutex_lock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
+	pthread_mutex_unlock(&all_readers);
 
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt++;
-	if(add_rd_cnt==1){
-		pthread_mutex_lock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count++;
+	if(add_readers_count==1){
+		pthread_mutex_lock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	node* temp=getAccount(ID);
-
-
-
+	BankAccount* temp=getAccount(id);
 	if(!temp){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id " << ID << " does not exist" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id " << id << " does not exist" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-	}else if(temp->Pass!=Pass){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - password for account id " << ID << " is incorrect" << endl;
+		pthread_mutex_unlock(&print_mutex);
+	}else if(temp->password!=password){
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - password for account id " << id << " is incorrect" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else {
-		pthread_mutex_lock(&(temp->lock_chng_wrt));
+		pthread_mutex_lock(&(temp->chang_writer));
 		(temp->amount)+=amount;
-		pthread_mutex_lock(&lock_print);
-		to <<  atmID << ": Account "<< ID <<" new balance is "<< temp->amount <<" after " << amount << " $ was deposited" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to <<  atmID << ": Account "<< id <<" new balance is "<< temp->amount <<" after " << amount << " $ was deposited" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-		pthread_mutex_unlock(&(temp->lock_chng_wrt));
+		pthread_mutex_unlock(&print_mutex);
+		pthread_mutex_unlock(&(temp->chang_writer));
 	}
 
-
-
-
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt--;
-	if(add_rd_cnt==0){
-		pthread_mutex_unlock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count--;
+	if(add_readers_count==0){
+		pthread_mutex_unlock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt--;
-	if(all_rd_cnt==0){
-		pthread_mutex_unlock(&lock_all_wrt);
+	pthread_mutex_lock(&all_readers);
+	readers_count--;
+	if(readers_count==0){
+		pthread_mutex_unlock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
-	//printf("***D****\n");
+	pthread_mutex_unlock(&all_readers);
 }
 
-
-int list::withdrawal(int ID,int Pass,int amount,int atmID){
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt++;
-	if(all_rd_cnt==1){
-		pthread_mutex_lock(&lock_all_wrt);
+//READERS WRITERS 2015S
+int BankAccountsList::withdrawal(int id,int password,int amount,int atmID){
+	pthread_mutex_lock(&all_readers);
+	readers_count++;
+	if(readers_count==1){
+		pthread_mutex_lock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
+	pthread_mutex_unlock(&all_readers);
 
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt++;
-	if(add_rd_cnt==1){
-		pthread_mutex_lock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count++;
+	if(add_readers_count==1){
+		pthread_mutex_lock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	node* temp=getAccount(ID);
-
-
-
+	BankAccount* temp=getAccount(id);
+	
 	if(!temp){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id " << ID << " does not exist" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id " << id << " does not exist" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-	}else if(temp->Pass!=Pass){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - password for account id " << ID << " is incorrect" << endl;
+		pthread_mutex_unlock(&print_mutex);
+	}else if(temp->password!=password){
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - password for account id " << id << " is incorrect" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else if(temp->amount<amount){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id "<< ID << " balance is lower than " << amount << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id "<< id << " balance is lower than " << amount << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	} else{
-		pthread_mutex_lock(&(temp->lock_chng_wrt));
+		pthread_mutex_lock(&(temp->chang_writer));
 		temp->amount-=amount;
-		pthread_mutex_lock(&lock_print);
-		to <<  atmID << ": Account "<< ID <<" new balance is "<< temp->amount <<" after " << amount << " $ was withdrew" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to <<  atmID << ": Account "<< id <<" new balance is "<< temp->amount <<" after " << amount << " $ was withdrew" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-		pthread_mutex_unlock(&(temp->lock_chng_wrt));
+		pthread_mutex_unlock(&print_mutex);
+		pthread_mutex_unlock(&(temp->chang_writer));
 	}
-
-
-
-
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt--;
-	if(add_rd_cnt==0){
-		pthread_mutex_unlock(&lock_add_wrt);
+	
+	pthread_mutex_lock(&add_reader);
+	add_readers_count--;
+	if(add_readers_count==0){
+		pthread_mutex_unlock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt--;
-	if(all_rd_cnt==0){
-		pthread_mutex_unlock(&lock_all_wrt);
+	pthread_mutex_lock(&all_readers);
+	readers_count--;
+	if(readers_count==0){
+		pthread_mutex_unlock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
-	//printf("***W****\n");
+	pthread_mutex_unlock(&all_readers);
 }
-int list::balance(int ID,int Pass,int atmID){
 
-	pthread_mutex_lock(&lock_all_taxrd);	
-	all_taxrd_cnt++;
-	if(all_taxrd_cnt==1){
-		pthread_mutex_lock(&lock_all_taxwrt);
+//READERS WRITERS 2015S
+int BankAccountsList::balance(int id,int password,int atmID){
+
+	pthread_mutex_lock(&all_tax_readers);	
+	all_tax_readers_count++;
+	if(all_tax_readers_count==1){
+		pthread_mutex_lock(&all_tax_writers);
 	}
-	pthread_mutex_unlock(&lock_all_taxrd);
+	pthread_mutex_unlock(&all_tax_readers);
 
-	pthread_mutex_lock(&lock_add_rd);	
-	add_rd_cnt++;
-	if(add_rd_cnt==1){
-		pthread_mutex_lock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);	
+	add_readers_count++;
+	if(add_readers_count==1){
+		pthread_mutex_lock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	node* temp=getAccount(ID);
-
+	BankAccount* temp=getAccount(id);
 
 
 	if(!temp){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id " << ID << " does not exist" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id " << id << " does not exist" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-	}else if(temp->Pass!=Pass){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - password for account id " << ID << " is incorrect" << endl;
+		pthread_mutex_unlock(&print_mutex);
+	}else if(temp->password!=password){
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - password for account id " << id << " is incorrect" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else{
-		pthread_mutex_lock(&(temp->lock_chng_rd));
-		temp->chng_rd_cnt++;
-		if(temp->chng_rd_cnt==1){
-			pthread_mutex_lock(&(temp->lock_chng_wrt));
+		pthread_mutex_lock(&(temp->chang_reader));
+		temp->readers_count++;
+		if(temp->readers_count==1){
+			pthread_mutex_lock(&(temp->chang_writer));
 		}
-		pthread_mutex_unlock(&(temp->lock_chng_rd));
+		pthread_mutex_unlock(&(temp->chang_reader));
 
-		pthread_mutex_lock(&lock_print);
-		to <<  atmID << ": Account "<< ID <<" balance is "<< temp->amount << endl;
+		pthread_mutex_lock(&print_mutex);
+		to <<  atmID << ": Account "<< id <<" balance is "<< temp->amount << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 
-		pthread_mutex_lock(&(temp->lock_chng_rd));
-		temp->chng_rd_cnt--;
-		if(temp->chng_rd_cnt==0){
-			pthread_mutex_unlock(&(temp->lock_chng_wrt));
+		pthread_mutex_lock(&(temp->chang_reader));
+		temp->readers_count--;
+		if(temp->readers_count==0){
+			pthread_mutex_unlock(&(temp->chang_writer));
 		}
-		pthread_mutex_unlock(&(temp->lock_chng_rd));
+		pthread_mutex_unlock(&(temp->chang_reader));
 	}
 
 
-
-
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt--;
-	if(add_rd_cnt==0){
-		pthread_mutex_unlock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count--;
+	if(add_readers_count==0){
+		pthread_mutex_unlock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	pthread_mutex_lock(&lock_all_taxrd);	
-	all_taxrd_cnt--;
-	if(all_taxrd_cnt==0){
-		pthread_mutex_unlock(&lock_all_taxwrt);
+	pthread_mutex_lock(&all_tax_readers);	
+	all_tax_readers_count--;
+	if(all_tax_readers_count==0){
+		pthread_mutex_unlock(&all_tax_writers);
 	}
-	pthread_mutex_unlock(&lock_all_taxrd);
-	//printf("***B****\n");
+	pthread_mutex_unlock(&all_tax_readers);
 }
 
+//READERS WRITERS 2015S
+int BankAccountsList::transfer(int id,int password,int targetID,int amount,int atmID){
 
-int list::transfer(int ID,int Pass,int targetID,int amount,int atmID){
-
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt++;
-	if(all_rd_cnt==1){
-		pthread_mutex_lock(&lock_all_wrt);
+	pthread_mutex_lock(&all_readers);
+	readers_count++;
+	if(readers_count==1){
+		pthread_mutex_lock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
+	pthread_mutex_unlock(&all_readers);
 
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt++;
-	if(add_rd_cnt==1){
-		pthread_mutex_lock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count++;
+	if(add_readers_count==1){
+		pthread_mutex_lock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
 
-	node* temp=getAccount(ID);
-	node* tempT=getAccount(targetID);
-
-
-
+	BankAccount* temp=getAccount(id);
+	BankAccount* tempT=getAccount(targetID);
 
 
 	if(!temp){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id " << ID << " does not exist" << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id " << id << " does not exist" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
-	}else if(temp->Pass!=Pass){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - password for account id " << ID << " is incorrect" << endl;
+		pthread_mutex_unlock(&print_mutex);
+	}else if(temp->password!=password){
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - password for account id " << id << " is incorrect" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else if(temp->amount < amount){
-		pthread_mutex_lock(&lock_print);
-		to << "Error " << atmID <<": Your transaction failed - account id "<< ID << " balance is lower than " << amount << endl;
+		pthread_mutex_lock(&print_mutex);
+		to << "Error " << atmID <<": Your transaction failed - account id "<< id << " balance is lower than " << amount << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else if(!tempT){
-		pthread_mutex_lock(&lock_print);
+		pthread_mutex_lock(&print_mutex);
 		to << "Error " << atmID <<": Your transaction failed - account id " << targetID << " does not exist" << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 	}else{
-		if(temp->ID > tempT->ID){
-			pthread_mutex_lock(&(temp->lock_chng_wrt));
-			pthread_mutex_lock(&(tempT->lock_chng_wrt));
+		if(temp->id > tempT->id){
+			pthread_mutex_lock(&(temp->chang_writer));
+			pthread_mutex_lock(&(tempT->chang_writer));
 		} else{
-			pthread_mutex_lock(&(tempT->lock_chng_wrt));
-			pthread_mutex_lock(&(temp->lock_chng_wrt));
+			pthread_mutex_lock(&(tempT->chang_writer));
+			pthread_mutex_lock(&(temp->chang_writer));
 		}
 
 		temp->amount-=amount;
 		tempT->amount+=amount;
-		pthread_mutex_lock(&lock_print);
-		to <<  atmID << ": Transfer " << amount << " from account " << temp->ID << " to account " << tempT->ID << " new account balance is " << temp->amount << " new target account balance is " << tempT->amount << endl;
+		pthread_mutex_lock(&print_mutex);
+		to <<  atmID << ": Transfer " << amount << " from account " << temp->id << " to account " << tempT->id << " new account balance is " << temp->amount << " new target account balance is " << tempT->amount << endl;
 		sleep(1);
-		pthread_mutex_unlock(&lock_print);
+		pthread_mutex_unlock(&print_mutex);
 
-		if(temp->ID > tempT->ID){
-			pthread_mutex_unlock(&(tempT->lock_chng_wrt));
-			pthread_mutex_unlock(&(temp->lock_chng_wrt));
+		if(temp->id > tempT->id){
+			pthread_mutex_unlock(&(tempT->chang_writer));
+			pthread_mutex_unlock(&(temp->chang_writer));
 		} else{
-			pthread_mutex_unlock(&(temp->lock_chng_wrt));
-			pthread_mutex_unlock(&(tempT->lock_chng_wrt));
+			pthread_mutex_unlock(&(temp->chang_writer));
+			pthread_mutex_unlock(&(tempT->chang_writer));
 		}
 	}
 
 
-
-
-	pthread_mutex_lock(&lock_add_rd);
-	add_rd_cnt--;
-	if(add_rd_cnt==0){
-		pthread_mutex_unlock(&lock_add_wrt);
+	pthread_mutex_lock(&add_reader);
+	add_readers_count--;
+	if(add_readers_count==0){
+		pthread_mutex_unlock(&add_writer);
 	}
-	pthread_mutex_unlock(&lock_add_rd);
+	pthread_mutex_unlock(&add_reader);
 
-	pthread_mutex_lock(&lock_all_rd);
-	all_rd_cnt--;
-	if(all_rd_cnt==0){
-		pthread_mutex_unlock(&lock_all_wrt);
+	pthread_mutex_lock(&all_readers);
+	readers_count--;
+	if(readers_count==0){
+		pthread_mutex_unlock(&all_writers);
 	}
-	pthread_mutex_unlock(&lock_all_rd);
-	//printf("***T****\n");
+	pthread_mutex_unlock(&all_readers);
 }
 
-
-int list::tax(){
+//READERS WRITERS 2015S
+int BankAccountsList::tax(){
 	int i;
 	int curtax;
-	///////////////////////////////////
 	int randnum = ((rand() % 3) + 2);
-	//////////////////////////////////
 
-	pthread_mutex_lock(&lock_all_wrt);
-	pthread_mutex_lock(&lock_all_taxwrt);
+	pthread_mutex_lock(&all_writers);
+	pthread_mutex_lock(&all_tax_writers);
 
-	pthread_mutex_lock(&lock_print);
+	pthread_mutex_lock(&print_mutex);
 
-	node* temp=head;
+	BankAccount* temp=head;
 	for (i=0 ; i < numaccount ; i++){	
 		curtax = (temp->amount)*randnum / 100;
 		taxsum+=curtax;
 		temp->amount -= curtax;
-		to << " Bank: commissions of " << randnum << " % were charged, the bank gained " << curtax << "$ from account " << temp->ID << endl;
-		temp=temp->next;
+		to << " Bank: commissions of " << randnum << " % were charged, the bank gained " << curtax << "$ from account " << temp->id << endl;
+		temp=temp->Next;
 	}
 
-	pthread_mutex_unlock(&lock_print);
+	pthread_mutex_unlock(&print_mutex);
 
-	pthread_mutex_unlock(&lock_all_taxwrt);
-	pthread_mutex_unlock(&lock_all_wrt);
-	//printf("***tax****\n");
+	pthread_mutex_unlock(&all_tax_writers);
+	pthread_mutex_unlock(&all_writers);
 }
 
-
-void list::print(){
+//READERS WRITERS 2015S
+void BankAccountsList::print(){
 
 
 	int i;
 
-	pthread_mutex_lock(&lock_all_wrt);
+	pthread_mutex_lock(&all_writers);
 
-	node* arr[numaccount];
-	int	temptaxsum =  taxsum;
-	node* ptr = head;
+	BankAccount* arr[numaccount];
+	int	tempTax =  taxsum;
+	BankAccount* itr = head;
 	int k=numaccount;
 	for(i=0 ; i< k ; i++){
-		node* temp = new node(ptr->ID,ptr->amount,ptr->Pass);
+		BankAccount* temp = new BankAccount(itr->id,itr->amount,itr->password);
 		arr[i]=temp;
-		ptr=ptr->next;
+		itr=itr->Next;
 	}
-	pthread_mutex_unlock(&lock_all_wrt);
+	pthread_mutex_unlock(&all_writers);
 	int j;
 	for(i=0 ; i< k ; i++){
 
 		for(j=0 ; j< k ; j++){
 
 			if(j!=k-1){
-				if(arr[j]->ID > arr[j+1]->ID){
-					node* tmp=arr[j+1];
+				if(arr[j]->id > arr[j+1]->id){
+					BankAccount* tmp=arr[j+1];
 					arr[j+1]=arr[j];
 					arr[j]=tmp;
 
@@ -388,49 +370,48 @@ void list::print(){
 		}
 
 	}
-	//pthread_mutex_lock(&lock_print);
 	printf("\033[2J");
 	printf("\033[1;1H");
 	printf("Current Bank Status\n");
 	for(i=0 ; i<k ; i++){
-		printf("Account %d: Balance  %d $ , Account Password  %d\n",arr[i]->ID,arr[i]->amount,arr[i]->Pass);
+		printf("Account %d: Balance  %d $ , Account Password  %d\n",arr[i]->id,arr[i]->amount,arr[i]->password);
 	}
-	printf("The Bank has %d $\n",temptaxsum);
+	printf("The Bank has %d $\n",tempTax);
 	for(i=0 ; i<k ; i++){
 		delete arr[i];
 	}
-	//pthread_mutex_unlock(&lock_print);
-
 }
-node::~node(){
-	pthread_mutex_destroy(&lock_chng_rd);
-	pthread_mutex_destroy(&lock_chng_wrt);
+//READERS WRITERS 2015S
+BankAccount::~BankAccount(){
+	pthread_mutex_destroy(&chang_reader);
+	pthread_mutex_destroy(&chang_writer);
 }
-list::~list(){
+//READERS WRITERS 2015S
+BankAccountsList::~BankAccountsList(){
 
-	pthread_mutex_destroy(&lock_all_rd);
-	pthread_mutex_destroy(&lock_all_wrt);
-	pthread_mutex_destroy(&lock_add_rd);
-	pthread_mutex_destroy(&lock_add_wrt);
-	pthread_mutex_destroy(&lock_print);
+	pthread_mutex_destroy(&all_readers);
+	pthread_mutex_destroy(&all_writers);
+	pthread_mutex_destroy(&add_reader);
+	pthread_mutex_destroy(&add_writer);
+	pthread_mutex_destroy(&print_mutex);
 
-	node* ptr = head;
-	node* temp = ptr;
-	while(ptr){
-		temp = ptr;
-		ptr = ptr->next;
-		delete temp;
+	BankAccount* itr = head;
+	BankAccount* tempAccount = itr;
+	while(itr){
+		tempAccount = itr;
+		itr = itr->Next;
+		delete tempAccount;
 	}
 
 }
-node* list::getAccount(int ID){
+BankAccount* BankAccountsList::getAccount(int id){
 	int i;
-	node* ptr=head;
+	BankAccount* itr=head;
 	for(i=0;i<numaccount;i++){
-		if(ptr->ID==ID){
-			return ptr;
+		if(itr->id==id){
+			return itr;
 		}
-		ptr = ptr->next;
+		itr = itr->Next;
 	}
 
 	return NULL;

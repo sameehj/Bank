@@ -7,98 +7,109 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+
 using namespace std;
 using std::ostream;
 extern ofstream to;
-class node{
+
+class BankAccount{
+
 	public:
-		int ID;
+		int id;
 		int amount;
-		int Pass;
-		int chng_rd_cnt;
-		pthread_mutex_t lock_chng_rd;
-		pthread_mutex_t lock_chng_wrt;
-		node* next;
-		node(int ID,int amount,int Pass):ID(ID),amount(amount),Pass(Pass),chng_rd_cnt(0){
-			if (pthread_mutex_init(&lock_chng_rd, NULL) != 0)
+		int password;
+		int readers_count;
+		
+		pthread_mutex_t chang_reader;
+		pthread_mutex_t chang_writer;
+		BankAccount* Next;
+		
+		BankAccount(int id,int amount,int password):id(id),amount(amount),password(password),readers_count(0){ // constructor
+			if (pthread_mutex_init(&chang_reader, NULL) != 0)
 			{	
 				perror(NULL);
 				exit(0);
 			}
-			if (pthread_mutex_init(&lock_chng_wrt, NULL) != 0)
+			if (pthread_mutex_init(&chang_writer, NULL) != 0)
 			{
 				perror(NULL);
 				exit(0);
 			}
 		}
-		~node();
+		~BankAccount(); // destructor
 };
-class list{
-	node* head;
-	node* tail;
+
+class BankAccountsList{
+
+	pthread_mutex_t all_readers;   // Mutexes
+	pthread_mutex_t all_writers;
+	pthread_mutex_t add_reader;
+	pthread_mutex_t add_writer;
+	pthread_mutex_t all_tax_readers;
+	pthread_mutex_t all_tax_writers;
+	pthread_mutex_t print_mutex;
+	
+	
+	BankAccount* head;
+	BankAccount* tail;
 	int taxsum;
 	int numaccount;
-	int all_rd_cnt;
-	int add_rd_cnt;
-	int all_taxrd_cnt;
-	pthread_mutex_t lock_all_rd;
-	pthread_mutex_t lock_all_wrt;
-	pthread_mutex_t lock_add_rd;
-	pthread_mutex_t lock_add_wrt;
-	pthread_mutex_t lock_all_taxrd;
-	pthread_mutex_t lock_all_taxwrt;
-	pthread_mutex_t lock_print;
+	int readers_count;
+	int add_readers_count;
+	int all_tax_readers_count;
 
-	node* getAccount(int ID);
+	BankAccount* getAccount(int id);
 
 	public:
-	list():head(NULL),tail(NULL),taxsum(0),numaccount(0),all_rd_cnt(0),add_rd_cnt(0),all_taxrd_cnt(0){
+	BankAccountsList():head(NULL),tail(NULL),taxsum(0),numaccount(0),readers_count(0),add_readers_count(0),all_tax_readers_count(0){
 
-		if (pthread_mutex_init(&lock_all_rd, NULL) != 0)
+		if (pthread_mutex_init(&all_readers, NULL) != 0)  // mutex init
 		{	
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_all_wrt, NULL) != 0)
+		if (pthread_mutex_init(&all_writers, NULL) != 0)
 		{
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_add_rd, NULL) != 0)
+		if (pthread_mutex_init(&add_reader, NULL) != 0)
 		{	
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_add_wrt, NULL) != 0)
+		if (pthread_mutex_init(&add_writer, NULL) != 0)
 		{
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_all_taxrd, NULL) != 0)
+		if (pthread_mutex_init(&all_tax_readers, NULL) != 0)
 		{	
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_all_taxwrt, NULL) != 0)
+		if (pthread_mutex_init(&all_tax_writers, NULL) != 0)
 		{
 			perror(NULL);
 			exit(0);
 		}
-		if (pthread_mutex_init(&lock_print, NULL) != 0)
+		if (pthread_mutex_init(&print_mutex, NULL) != 0)
 		{	
 			perror(NULL);
 			exit(0);
 		}
 
 	}
-	int open_account(int ID,int Pass,int amount,int atmID);
-	int deposit(int ID,int Pass,int amount,int atmID);
-	int withdrawal(int ID,int Pass,int amount,int atmID);
-	int balance(int ID,int Pass,int atmID);
-	int transfer(int ID,int Pass,int targetID,int amount,int atmID);
+	
+	// functions for List
+	int open_account(int id,int password,int amount,int atmID);
+	int deposit(int id,int password,int amount,int atmID);
+	int withdrawal(int id,int password,int amount,int atmID);
+	int balance(int id,int password,int atmID);
+	int transfer(int id,int password,int targetID,int amount,int atmID);
 	int tax();
 	void print();
-	~list();
+	~BankAccountsList();
 };
 
 
